@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>イメージみっけ</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *{font-family:'Noto Sans JP',sans-serif}
+    .clay-panel{background:#e8ecf2;border-radius:32px;box-shadow:12px 12px 24px #cdd3de,-12px -12px 24px #fff,inset 2px 2px 4px rgba(255,255,255,.8),inset -2px -2px 4px rgba(0,0,0,.02)}
+    .clay-input{background:#e8ecf2;border-radius:16px;border:2px solid transparent;box-shadow:inset 6px 6px 12px #cdd3de,inset -6px -6px 12px #fff;transition:all .2s ease;outline:none}
+    .clay-input:focus{border:2px solid #a78bfa;box-shadow:inset 8px 8px 16px #cdd3de,inset -8px -8px 16px #fff}
+    .clay-btn{background:linear-gradient(135deg,#a78bfa,#818cf8);border-radius:20px;box-shadow:6px 6px 12px #cdd3de,-6px -6px 12px #fff,inset 4px 4px 8px rgba(255,255,255,.4),inset -4px -4px 8px rgba(0,0,0,.1);transition:all .15s ease;cursor:pointer;border:none;color:#fff}
+    .clay-btn:hover:not(:disabled){transform:translateY(-2px);box-shadow:8px 8px 16px #cdd3de,-8px -8px 16px #fff,inset 4px 4px 8px rgba(255,255,255,.4),inset -4px -4px 8px rgba(0,0,0,.1)}
+    .clay-btn:active,.clay-btn:disabled{transform:translateY(2px);box-shadow:inset 6px 6px 12px rgba(0,0,0,.15),inset -6px -6px 12px rgba(255,255,255,.3);opacity:.7;cursor:not-allowed}
+    .clay-btn-sm{background:#e8ecf2;border-radius:12px;box-shadow:4px 4px 8px #cdd3de,-4px -4px 8px #fff;border:none;cursor:pointer}
+    .clay-btn-sm:active{box-shadow:inset 4px 4px 8px #cdd3de,inset -4px -4px 8px #fff}
+    .clay-image-box{background:#e8ecf2;border-radius:24px;box-shadow:inset 8px 8px 16px #cdd3de,inset -8px -8px 16px #fff}
+    .spin{animation:spin 1s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .pulse{animation:pulse 2s cubic-bezier(.4,0,.6,1) infinite}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+    select{background:#e8ecf2;border-radius:16px;border:2px solid transparent;box-shadow:inset 6px 6px 12px #cdd3de,inset -6px -6px 12px #fff;outline:none;width:100%;padding:12px 40px 12px 16px;appearance:none;font-size:14px;font-weight:500;color:#334155;cursor:pointer}
+    textarea{background:transparent;outline:none;width:100%;padding:12px 16px;resize:none;height:96px;font-size:14px;color:#334155}
+    textarea::placeholder{color:#94a3b8}
+    .scrollbar::-webkit-scrollbar{width:8px}
+    .scrollbar::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:10px}
+  </style>
+</head>
+<body style="margin:0;background:#e8ecf2">
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useRef } = React;
+
+// ============================================================
+// ★ Cloudflare WorkerのURLをここに入力
+// 例: https://image-mikke.yourname.workers.dev
+// ============================================================
+const WORKER_URL = "https://image-mikke.yymmatsu.workers.dev";
+
+// インラインSVGアイコン (CDN不要・確実に動く)
+const IconSparkles = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/>
+  </svg>
+);
+const IconLoader = ({size=24}) => (
+  <svg className="spin" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+  </svg>
+);
+const IconDownload = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+  </svg>
+);
+const IconCopy = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
+  </svg>
+);
+const IconCheck = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="20 6 9 17 4 12"/>
+  </svg>
+);
+const IconAlert = () => (
+  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#fb7185" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+  </svg>
+);
+const IconImage = () => (
+  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>
+  </svg>
+);
+const IconX = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M18 6 6 18"/><path d="m6 6 12 12"/>
+  </svg>
+);
+const IconUpload = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
+  </svg>
+);
+const IconChevron = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+    <path d="M6 9l6 6 6-6"/>
+  </svg>
+);
+
+// 設定
+const PROMPT_MAPPINGS = {
+  style: {
+    "写真風": "photorealistic, professional photography",
+    "アニメ風": "anime style, vibrant colors",
+    "油絵風": "oil painting, canvas texture",
+    "水彩画風": "watercolor, soft edges",
+    "デジタルアート": "digital art, highly detailed"
+  },
+  quality: {
+    "標準": "good quality",
+    "高品質": "high quality, detailed",
+    "最高品質": "masterpiece, best quality, ultra-detailed, 8K"
+  },
+  lighting: {
+    "自然光": "natural lighting",
+    "スタジオライト": "studio lighting, professional",
+    "ドラマチック": "dramatic lighting, high contrast",
+    "柔らかい光": "soft lighting, diffused",
+    "逆光": "backlit, rim lighting"
+  },
+  composition: {
+    "クローズアップ": "close-up shot",
+    "全体像": "full body shot, wide angle",
+    "鳥瞰図": "aerial view, top-down",
+    "低いアングル": "low angle shot",
+    "指定なし (元画像に合わせる)": ""
+  }
+};
+
+const ASPECT_RATIOS = {
+  "SNS投稿 (3:4)": "3:4",
+  "SNSリール (9:16)": "9:16",
+  "横長コンテンツ (16:9)": "16:9",
+  "正方形 (1:1)": "1:1"
+};
+
+function App() {
+  const [content, setContent]       = useState("夕暮れの海辺で本を読む猫");
+  const [style, setStyle]           = useState("写真風");
+  const [quality, setQuality]       = useState("最高品質");
+  const [lighting, setLighting]     = useState("自然光");
+  const [composition, setComp]      = useState("全体像");
+  const [size, setSize]             = useState("正方形 (1:1)");
+  const [isGenerating, setGenerating] = useState(false);
+  const [generatedImage, setImage]  = useState(null);
+  const [finalPrompt, setPrompt]    = useState(null);
+  const [error, setError]           = useState(null);
+  const [copied, setCopied]         = useState(false);
+  const [refImage, setRefImage]     = useState(null);
+  const [isDragging, setDragging]   = useState(false);
+  const fileRef = useRef(null);
+
+  const processFile = (file) => {
+    if (!["image/jpeg","image/png","image/webp"].includes(file.type)) {
+      setError("JPG、PNG、WebP画像をアップロードしてください。"); return;
+    }
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setRefImage({ base64: reader.result.split(",")[1], mimeType: file.type, dataUrl: reader.result });
+      setComp("指定なし (元画像に合わせる)");
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault(); setDragging(false);
+    const f = e.dataTransfer.files[0]; if (f) processFile(f);
+  };
+
+  const handleGenerate = async () => {
+    if (!content.trim()) { setError("画像の内容を入力してください。"); return; }
+    setGenerating(true); setError(null); setImage(null); setPrompt(null); setCopied(false);
+    try {
+      const parts = [content, PROMPT_MAPPINGS.style[style], PROMPT_MAPPINGS.quality[quality], PROMPT_MAPPINGS.lighting[lighting], PROMPT_MAPPINGS.composition[composition]].filter(Boolean).join(", ");
+      const builtPrompt = refImage ? `Modify the attached image strictly: ${parts}` : parts;
+      setPrompt(builtPrompt);
+
+      const res = await fetch(`${WORKER_URL}/generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: builtPrompt,
+          aspectRatio: ASPECT_RATIOS[size],
+          referenceImage: refImage ? { base64: refImage.base64, mimeType: refImage.mimeType } : null
+        })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || "生成に失敗しました。");
+      setImage(`data:${data.mimeType};base64,${data.image}`);
+    } catch(err) {
+      setError(err.message || "エラーが発生しました。");
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const handleCopy = () => {
+    if (!finalPrompt) return;
+    navigator.clipboard.writeText(finalPrompt).then(() => { setCopied(true); setTimeout(()=>setCopied(false),2000); });
+  };
+
+  const handleDownload = () => {
+    if (!generatedImage) return;
+    const a = document.createElement("a"); a.href = generatedImage;
+    a.download = `mikke-image-${Date.now()}.png`; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  };
+
+  const SelectField = ({label, value, onChange, options}) => (
+    <div style={{marginBottom:0}}>
+      <label style={{display:"block",fontSize:13,fontWeight:700,color:"#64748b",marginBottom:8,marginLeft:4}}>{label}</label>
+      <div style={{position:"relative"}}>
+        <select value={value} onChange={e=>onChange(e.target.value)}>
+          {options.map(o=><option key={o} value={o}>{o}</option>)}
+        </select>
+        <div style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",pointerEvents:"none",color:"#94a3b8"}}>
+          <IconChevron />
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{minHeight:"100vh",background:"#e8ecf2",padding:"24px",display:"flex",flexDirection:"column"}}>
+
+      {/* ヘッダー */}
+      <header style={{textAlign:"center",marginBottom:32,paddingTop:16}}>
+        <h1 style={{fontSize:32,fontWeight:800,background:"linear-gradient(135deg,#8b5cf6,#6366f1)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",display:"inline-flex",alignItems:"center",gap:10}}>
+          <span style={{color:"#8b5cf6",WebkitTextFillColor:"#8b5cf6"}}><IconSparkles /></span>
+          イメージみっけ
+        </h1>
+        <p style={{color:"#64748b",marginTop:8,fontWeight:700,fontSize:13,letterSpacing:1}}>プロンプト不要で、とっておきの1枚を作ろう</p>
+      </header>
+
+      {/* メインレイアウト */}
+      <div style={{display:"flex",flexWrap:"wrap",gap:24,flex:1,maxWidth:1200,width:"100%",margin:"0 auto"}}>
+
+        {/* 左パネル */}
+        <div className="clay-panel" style={{width:360,flexShrink:0,padding:28,display:"flex",flexDirection:"column",gap:20}}>
+
+          {/* テキストエリア */}
+          <div>
+            <label style={{display:"block",fontSize:13,fontWeight:700,color:"#64748b",marginBottom:8,marginLeft:4}}>なにを描きたい？</label>
+            <div
+              className="clay-input"
+              style={{display:"flex",flexDirection:"column",overflow:"hidden",border: isDragging ? "2px solid #a78bfa" : "2px solid transparent",transform: isDragging ? "scale(1.01)" : "none"}}
+              onDragOver={e=>{e.preventDefault();setDragging(true)}}
+              onDragLeave={()=>setDragging(false)}
+              onDrop={handleDrop}
+            >
+              <textarea value={content} onChange={e=>setContent(e.target.value)} placeholder="生成したい画像の説明を入力..." />
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"0 12px 12px"}}>
+                <span style={{fontSize:11,color:"#94a3b8",fontWeight:700,display:"flex",alignItems:"center",gap:6}}>
+                  <IconUpload /> 画像をドロップ (参照用)
+                </span>
+                <button
+                  className="clay-btn-sm"
+                  style={{fontSize:12,padding:"6px 12px",fontWeight:700,color:"#475569"}}
+                  onClick={()=>fileRef.current?.click()}
+                >
+                  ファイル選択
+                </button>
+                <input type="file" ref={fileRef} onChange={e=>{const f=e.target.files[0];if(f)processFile(f);fileRef.current.value="";}} accept="image/jpeg,image/png,image/webp" style={{display:"none"}} />
+              </div>
+            </div>
+
+            {refImage && (
+              <div style={{marginTop:12,display:"inline-flex",alignItems:"center",gap:12,padding:"8px 16px 8px 8px",background:"rgba(255,255,255,0.6)",borderRadius:12,border:"1px solid #e2e8f0"}}>
+                <img src={refImage.dataUrl} style={{width:40,height:40,objectFit:"cover",borderRadius:8,border:"1px solid #e2e8f0"}} alt="ref" />
+                <div>
+                  <div style={{fontSize:12,fontWeight:700,color:"#7c3aed"}}>元画像セット完了！</div>
+                  <div style={{fontSize:10,color:"#64748b"}}>この画像を元に修正します</div>
+                </div>
+                <button className="clay-btn-sm" style={{padding:4,borderRadius:"50%",marginLeft:4}} onClick={()=>{setRefImage(null);setComp("全体像");}}>
+                  <IconX />
+                </button>
+              </div>
+            )}
+          </div>
+
+          <SelectField label="アートスタイル" value={style} onChange={setStyle} options={Object.keys(PROMPT_MAPPINGS.style)} />
+          <SelectField label="画質レベル" value={quality} onChange={setQuality} options={Object.keys(PROMPT_MAPPINGS.quality)} />
+          <SelectField label="ライティング" value={lighting} onChange={setLighting} options={Object.keys(PROMPT_MAPPINGS.lighting)} />
+          <SelectField label="構図" value={composition} onChange={setComp} options={Object.keys(PROMPT_MAPPINGS.composition)} />
+          <SelectField label="画像サイズ" value={size} onChange={setSize} options={Object.keys(ASPECT_RATIOS)} />
+
+          <button className="clay-btn" disabled={isGenerating} onClick={handleGenerate}
+            style={{padding:"16px",fontSize:16,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",gap:8,marginTop:8,width:"100%"}}>
+            {isGenerating
+              ? <><IconLoader size={22} /> 生成しています...</>
+              : <><IconSparkles /> {refImage ? "元画像から修正する" : "画像をみつける"}</>
+            }
+          </button>
+        </div>
+
+        {/* 右パネル */}
+        <div className="clay-panel" style={{flex:1,minWidth:300,minHeight:500,padding:28,display:"flex",flexDirection:"column",position:"relative"}}>
+
+          {/* 初期・ローディング */}
+          {!generatedImage && !error && (
+            <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24,textAlign:"center"}}>
+              {isGenerating ? (
+                <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:20}}>
+                  <div className="clay-btn" style={{padding:16,borderRadius:"50%",cursor:"default"}}>
+                    <IconLoader size={40} />
+                  </div>
+                  <p style={{fontSize:18,fontWeight:700,color:"#475569"}}>AIが絵の具を混ぜています...</p>
+                  <p style={{fontSize:13,color:"#64748b"}}>完成まで少しだけお待ちください</p>
+                </div>
+              ) : (
+                <div style={{opacity:.6,display:"flex",flexDirection:"column",alignItems:"center"}}>
+                  <div className="clay-image-box" style={{width:96,height:96,display:"flex",alignItems:"center",justifyContent:"center",color:"#94a3b8",marginBottom:24}}>
+                    <IconImage />
+                  </div>
+                  <h2 style={{fontSize:22,fontWeight:700,color:"#475569",marginBottom:8}}>キャンバスは真っ白です</h2>
+                  <p style={{color:"#64748b",fontSize:13,fontWeight:500}}>左側で設定して「画像をみつける」を押してね！</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* エラー */}
+          {error && (
+            <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24,textAlign:"center",zIndex:10}}>
+              <div className="clay-image-box" style={{padding:28,display:"flex",flexDirection:"column",alignItems:"center",maxWidth:400}}>
+                <IconAlert />
+                <h2 style={{fontSize:18,fontWeight:700,color:"#f43f5e",margin:"16px 0 8px"}}>ちょっと問題がおきました</h2>
+                <p style={{fontSize:13,color:"#475569",marginBottom:20,whiteSpace:"pre-line"}}>{error}</p>
+                <button className="clay-btn-sm" style={{padding:"8px 24px",fontWeight:700,color:"#475569",fontSize:13}} onClick={()=>setError(null)}>やり直す</button>
+              </div>
+            </div>
+          )}
+
+          {/* 成功 */}
+          {generatedImage && !isGenerating && (
+            <div className="scrollbar" style={{display:"flex",flexDirection:"column",height:"100%",overflowY:"auto",gap:20}}>
+              <div className="clay-image-box" style={{display:"flex",alignItems:"center",justifyContent:"center",padding:16,minHeight:300,position:"relative"}}>
+                <img src={generatedImage} alt="Generated" style={{maxWidth:"100%",maxHeight:"60vh",objectFit:"contain",borderRadius:12}} />
+                <button className="clay-btn" onClick={handleDownload}
+                  style={{position:"absolute",bottom:16,right:16,padding:"10px 16px",fontSize:13,fontWeight:700,display:"flex",alignItems:"center",gap:6}}>
+                  <IconDownload /> 保存する
+                </button>
+              </div>
+              <div className="clay-image-box" style={{padding:20}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+                  <span style={{fontSize:13,fontWeight:700,color:"#64748b",display:"flex",alignItems:"center",gap:6}}>
+                    <span style={{color:"#8b5cf6"}}><IconSparkles /></span> 使用したプロンプト
+                  </span>
+                  <button className="clay-btn-sm" onClick={handleCopy}
+                    style={{padding:"6px 12px",fontSize:12,fontWeight:700,color:"#475569",display:"flex",alignItems:"center",gap:4}}>
+                    {copied ? <><IconCheck /> コピー完了！</> : <><IconCopy /> コピーする</>}
+                  </button>
+                </div>
+                <div style={{background:"rgba(255,255,255,0.5)",padding:16,borderRadius:16,fontSize:12,fontFamily:"monospace",lineHeight:1.8,wordBreak:"break-all",color:"#475569"}}>
+                  {finalPrompt}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
