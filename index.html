@@ -26,7 +26,7 @@
     .pulse{animation:pulse 2s cubic-bezier(.4,0,.6,1) infinite}
     @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
     
-    /* セレクトボックスの凸型デザインと調整 */
+    /* セレクトボックスの凹型デザインと調整 */
     select{
       -webkit-appearance: none; /* Safari等のブラウザ標準デザインを強制リセット */
       -moz-appearance: none;
@@ -34,7 +34,7 @@
       background: #e8ecf2;
       border-radius: 16px; /* テキストエリアと同じ丸み */
       border: 2px solid transparent;
-      box-shadow: 6px 6px 12px #cdd3de, -6px -6px 12px #ffffff; /* 凸型の立体感 */
+      box-shadow: inset 6px 6px 12px #cdd3de, inset -6px -6px 12px #ffffff; /* 凹型の立体感 */
       outline: none;
       width: 100%;
       height: 54px; /* 高さをしっかり固定してふっくらさせる */
@@ -46,8 +46,9 @@
       transition: all .2s ease;
       box-sizing: border-box;
     }
-    select:active{
-      box-shadow:inset 4px 4px 8px #cdd3de,inset -4px -4px 8px #ffffff;
+    select:focus{
+      border: 2px solid #a78bfa;
+      box-shadow: inset 8px 8px 16px #cdd3de, inset -8px -8px 16px #ffffff;
     }
     
     textarea{background:transparent;outline:none;width:100%;padding:16px 20px;resize:none;height:120px;font-size:14px;color:#334155;font-weight:700;box-sizing:border-box}
