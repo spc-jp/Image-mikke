@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>イメージみっけ</title>
+  <title>イメージみっけ | プロンプト不要のAI画像生成</title>
+  <meta name="description" content="日本語で説明するだけでAIが画像を生成。プロンプト不要でとっておきの1枚を作ろう。">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
@@ -49,7 +50,7 @@
         inset -4px -4px 8px rgba(0,0,0,0.1);
       transition: all 0.15s ease;
     }
-    .clay-btn:hover {
+    .clay-btn:hover:not(:disabled) {
       transform: translateY(-2px);
       box-shadow:
         8px 8px 16px #cdd3de,
@@ -69,6 +70,7 @@
       box-shadow:
         4px 4px 8px #cdd3de,
         -4px -4px 8px #ffffff;
+      transition: all 0.15s ease;
     }
     .clay-btn-secondary:active {
       box-shadow:
@@ -93,6 +95,30 @@
       -webkit-text-fill-color: transparent;
       background-clip: text;
     }
+    .main-layout {
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+    @media (min-width: 1024px) {
+      .main-layout {
+        flex-direction: row;
+        align-items: flex-start;
+      }
+    }
+    .step-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 1.5rem;
+      height: 1.5rem;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #a78bfa, #818cf8);
+      color: white;
+      font-size: 0.7rem;
+      font-weight: 800;
+      flex-shrink: 0;
+    }
   </style>
 </head>
 <body>
@@ -101,8 +127,11 @@
   <script type="text/babel">
     const { useState } = React;
 
-    // ★ ここにGemini APIキーを入力してください ★
-    const API_KEY = "";
+    // ============================================================
+    // ★ CloudflareワーカーのURLをここに設定してください ★
+    // 例: https://image-mikke.あなたのサブドメイン.workers.dev
+    // ============================================================
+    const WORKER_URL = "https://image-mikke.yymmatsu.workers.dev";
 
     const PROMPT_MAPPINGS = {
       style: {
@@ -139,39 +168,38 @@
       "正方形 (1:1)": "1:1"
     };
 
-    const fetchWithRetry = async (url, options, maxRetries = 5) => {
+    // Workerへのリクエスト（リトライ付き）
+    const callWorker = async (endpoint, payload, maxRetries = 3) => {
       let delay = 1000;
       for (let i = 0; i < maxRetries; i++) {
         try {
-          const response = await fetch(url, options);
-          if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.error?.message || `HTTPエラー: ${response.status}`);
-          }
-          return response;
-        } catch (error) {
-          if (i === maxRetries - 1) {
-            throw new Error("通信に失敗しました。時間をおいて再度お試しください。");
-          }
-          await new Promise(res => setTimeout(res, delay));
+          const res = await fetch(`${WORKER_URL}${endpoint}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || `エラー: ${res.status}`);
+          return data;
+        } catch (err) {
+          if (i === maxRetries - 1) throw err;
+          await new Promise(r => setTimeout(r, delay));
           delay *= 2;
         }
       }
     };
 
-    // アイコンSVGコンポーネント（Lucide代替）
-    const IconSparkles = () => (
-      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    // アイコン（インラインSVG）
+    const IconSparkles = ({ size = 20, color = "currentColor" }) => (
+      <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>
       </svg>
     );
-
     const IconLoader = ({ size = 20 }) => (
       <svg className="spin" xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
       </svg>
     );
-
     const IconImage = () => (
       <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
         <rect width="18" height="18" x="3" y="3" rx="2" ry="2"/>
@@ -179,50 +207,44 @@
         <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>
       </svg>
     );
-
-    const IconAlertCircle = () => (
-      <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{color:'#fb7185'}}>
+    const IconDownload = () => (
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="7 10 12 15 17 10"/>
+        <line x1="12" x2="12" y1="15" y2="3"/>
+      </svg>
+    );
+    const IconCopy = () => (
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
+        <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
+      </svg>
+    );
+    const IconCheck = () => (
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="20 6 9 17 4 12"/>
+      </svg>
+    );
+    const IconAlert = () => (
+      <svg xmlns="http://www.w3.org/2000/svg" width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#fb7185" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="12" cy="12" r="10"/>
         <line x1="12" x2="12" y1="8" y2="12"/>
         <line x1="12" x2="12.01" y1="16" y2="16"/>
       </svg>
     );
 
-    const IconDownload = () => (
-      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-        <polyline points="7 10 12 15 17 10"/>
-        <line x1="12" x2="12" y1="15" y2="3"/>
-      </svg>
-    );
-
-    const IconCopy = () => (
-      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
-        <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
-      </svg>
-    );
-
-    const IconCheck = () => (
-      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-        <polyline points="20 6 9 17 4 12"/>
-      </svg>
-    );
-
     const SelectComp = ({ value, onChange, options }) => (
-      <div style={{ position: 'relative' }}>
+      <div style={{ position: "relative" }}>
         <select
           value={value}
           onChange={onChange}
           className="clay-input w-full text-slate-700 font-medium py-3 px-4 text-sm cursor-pointer"
-          style={{ appearance: 'none', WebkitAppearance: 'none' }}
+          style={{ appearance: "none", WebkitAppearance: "none" }}
         >
-          {options.map(opt => (
-            <option key={opt} value={opt}>{opt}</option>
-          ))}
+          {options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
         </select>
-        <div style={{ position: 'absolute', top: 0, right: 0, bottom: 0, display: 'flex', alignItems: 'center', paddingRight: '1rem', pointerEvents: 'none', color: '#94a3b8' }}>
-          <svg width="20" height="20" fill="currentColor" viewBox="0 0 20 20">
+        <div style={{ position: "absolute", top: 0, right: 0, bottom: 0, display: "flex", alignItems: "center", paddingRight: "1rem", pointerEvents: "none", color: "#94a3b8" }}>
+          <svg width="18" height="18" fill="currentColor" viewBox="0 0 20 20">
             <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
           </svg>
         </div>
@@ -230,59 +252,37 @@
     );
 
     function App() {
-      const [apiKey, setApiKey] = useState(API_KEY);
-      const [showApiInput, setShowApiInput] = useState(!API_KEY);
-      const [content, setContent] = useState('夕暮れの海辺で本を読む猫');
-      const [style, setStyle] = useState('写真風');
-      const [quality, setQuality] = useState('最高品質');
-      const [lighting, setLighting] = useState('自然光');
-      const [composition, setComposition] = useState('全体像');
-      const [size, setSize] = useState('正方形 (1:1)');
+      const [content, setContent]       = useState("夕暮れの海辺で本を読む猫");
+      const [style, setStyle]           = useState("写真風");
+      const [quality, setQuality]       = useState("最高品質");
+      const [lighting, setLighting]     = useState("自然光");
+      const [composition, setComposition] = useState("全体像");
+      const [size, setSize]             = useState("正方形 (1:1)");
 
-      const [isGenerating, setIsGenerating] = useState(false);
+      const [phase, setPhase]           = useState("idle"); // idle / translating / generating / done / error
       const [generatedImage, setGeneratedImage] = useState(null);
-      const [finalPrompt, setFinalPrompt] = useState(null);
-      const [error, setError] = useState(null);
-      const [copySuccess, setCopySuccess] = useState(false);
+      const [finalPrompt, setFinalPrompt]       = useState(null);
+      const [errorMsg, setErrorMsg]             = useState(null);
+      const [copySuccess, setCopySuccess]       = useState(false);
+
+      const isGenerating = phase === "translating" || phase === "generating";
 
       const handleGenerate = async () => {
-        if (!content.trim()) {
-          setError("画像の内容を入力してください。");
-          return;
-        }
-        if (!apiKey.trim()) {
-          setError("APIキーを入力してください。");
-          return;
-        }
+        if (!content.trim()) { setErrorMsg("画像の内容を入力してください。"); setPhase("error"); return; }
 
-        setIsGenerating(true);
-        setError(null);
+        setPhase("translating");
+        setErrorMsg(null);
         setGeneratedImage(null);
         setFinalPrompt(null);
         setCopySuccess(false);
 
         try {
-          // Step 1: 日本語を英語に翻訳
-          const translationInstruction = `Translate the following Japanese text to English. Output ONLY the English translation, without any quotes or explanations.\nJapanese: ${content}`;
+          // Step1: 翻訳
+          const { translated } = await callWorker("/translate", { text: content });
 
-          const textResponse = await fetchWithRetry(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`,
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ contents: [{ parts: [{ text: translationInstruction }] }] })
-            }
-          );
-
-          const textData = await textResponse.json();
-          let translatedContent = textData.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
-          translatedContent = translatedContent.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
-
-          if (!translatedContent) throw new Error("翻訳に失敗しました。");
-
-          // Step 2: プロンプト構築
+          // Step2: プロンプト構築
           const englishPrompt = [
-            translatedContent,
+            translated,
             PROMPT_MAPPINGS.style[style],
             PROMPT_MAPPINGS.quality[quality],
             PROMPT_MAPPINGS.lighting[lighting],
@@ -290,40 +290,18 @@
           ].filter(Boolean).join(", ");
 
           setFinalPrompt(englishPrompt);
+          setPhase("generating");
 
-          // Step 3: 画像生成
+          // Step3: 画像生成
           const finalImagePrompt = `${englishPrompt}. Aspect ratio: ${ASPECT_RATIO_MAPPINGS[size]}.`;
+          const { image } = await callWorker("/generate", { prompt: finalImagePrompt });
 
-          const imageResponse = await fetchWithRetry(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-preview-image-generation:generateContent?key=${apiKey}`,
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                contents: [{ parts: [{ text: finalImagePrompt }] }],
-                generationConfig: { responseModalities: ['TEXT', 'IMAGE'] }
-              })
-            }
-          );
-
-          const imageData = await imageResponse.json();
-
-          if (imageData.candidates?.[0]?.finishReason && imageData.candidates[0].finishReason !== 'STOP') {
-            throw new Error(`画像生成がブロックされました (理由: ${imageData.candidates[0].finishReason})。別の内容をお試しください。`);
-          }
-
-          const base64Image = imageData.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
-
-          if (base64Image) {
-            setGeneratedImage(`data:image/png;base64,${base64Image}`);
-          } else {
-            throw new Error("画像データが取得できませんでした。モデルがまだ画像生成に対応していない可能性があります。");
-          }
+          setGeneratedImage(`data:image/png;base64,${image}`);
+          setPhase("done");
 
         } catch (err) {
-          setError(err.message || "エラーが発生しました。");
-        } finally {
-          setIsGenerating(false);
+          setErrorMsg(err.message || "エラーが発生しました。");
+          setPhase("error");
         }
       };
 
@@ -337,7 +315,7 @@
           ta.value = finalPrompt;
           document.body.appendChild(ta);
           ta.select();
-          document.execCommand('copy');
+          document.execCommand("copy");
           document.body.removeChild(ta);
           setCopySuccess(true);
           setTimeout(() => setCopySuccess(false), 2000);
@@ -346,223 +324,214 @@
 
       const handleDownload = () => {
         if (!generatedImage) return;
-        const link = document.createElement('a');
+        const link = document.createElement("a");
         link.href = generatedImage;
-        link.download = `mikke-image-${Date.now()}.png`;
+        link.download = `image-mikke-${Date.now()}.png`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
       };
 
       const Label = ({ children }) => (
-        <label className="block text-sm font-bold text-slate-500 mb-2 ml-1">{children}</label>
+        <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 700, color: "#64748b", marginBottom: "0.5rem", marginLeft: "0.25rem" }}>{children}</label>
       );
 
-      return (
-        <div className="min-h-screen p-4 flex flex-col" style={{ background: '#e8ecf2', color: '#334155' }}>
+      // フェーズ別のステータステキスト
+      const phaseText = {
+        translating: "日本語を翻訳しています...",
+        generating:  "AIが画像を描いています..."
+      };
 
-          {/* APIキー設定バー */}
-          {showApiInput && (
-            <div className="clay-panel p-4 mb-6 max-w-7xl mx-auto w-full">
-              <p className="text-sm font-bold text-slate-500 mb-2">🔑 Gemini APIキーを入力してください</p>
-              <div className="flex gap-3">
-                <input
-                  type="password"
-                  value={apiKey}
-                  onChange={e => setApiKey(e.target.value)}
-                  className="clay-input flex-1 py-2 px-4 text-sm text-slate-700"
-                  placeholder="AIzaSy..."
-                />
-                <button
-                  onClick={() => setShowApiInput(false)}
-                  className="clay-btn px-5 py-2 text-white text-sm font-bold"
-                >設定する</button>
-              </div>
-            </div>
-          )}
+      return (
+        <div style={{ minHeight: "100vh", background: "#e8ecf2", color: "#334155", padding: "1.5rem 1rem" }}>
 
           {/* ヘッダー */}
-          <header className="mb-8 text-center pt-2">
-            <h1 className="text-4xl font-extrabold inline-flex items-center gap-3" style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.1))' }}>
-              <span style={{ color: '#8b5cf6' }}>✦</span>
+          <header style={{ textAlign: "center", marginBottom: "2rem" }}>
+            <h1 style={{ fontSize: "2.25rem", fontWeight: 800, display: "inline-flex", alignItems: "center", gap: "0.75rem" }}>
+              <IconSparkles size={32} color="#8b5cf6" />
               <span className="gradient-text">イメージみっけ</span>
             </h1>
-            <p className="text-slate-500 mt-3 font-bold text-sm tracking-wide">プロンプト不要で、とっておきの1枚を作ろう</p>
-            {!showApiInput && (
-              <button onClick={() => setShowApiInput(true)} className="mt-2 text-xs text-slate-400 underline">APIキーを変更する</button>
-            )}
+            <p style={{ color: "#64748b", marginTop: "0.5rem", fontWeight: 700, fontSize: "0.9rem", letterSpacing: "0.05em" }}>
+              プロンプト不要で、とっておきの1枚を作ろう
+            </p>
           </header>
 
-          {/* メインコンテンツ */}
-          <main className="flex flex-col gap-6 flex-1 max-w-7xl w-full mx-auto" style={{ flexDirection: 'column' }}>
-
-            <div className="flex flex-col gap-6" style={{ display: 'flex', flexWrap: 'wrap' }}>
+          {/* メインレイアウト */}
+          <main style={{ maxWidth: "1100px", margin: "0 auto" }}>
+            <div className="main-layout">
 
               {/* 左パネル：設定 */}
-              <div className="clay-panel p-6 flex flex-col gap-5" style={{ minWidth: '280px', flex: '0 0 auto', width: '100%', maxWidth: '420px', alignSelf: 'start' }}>
+              <div className="clay-panel" style={{ padding: "1.75rem", flexShrink: 0, width: "100%", maxWidth: "380px" }}>
 
-                <div>
-                  <Label>なにを描きたい？（画像の内容）</Label>
+                <div style={{ marginBottom: "1.25rem" }}>
+                  <Label>なにを描きたい？（日本語でOK）</Label>
                   <textarea
                     value={content}
                     onChange={e => setContent(e.target.value)}
                     className="clay-input w-full text-slate-700 py-3 px-4 text-sm"
-                    style={{ resize: 'none', height: '7rem' }}
-                    placeholder="生成したい画像の説明を入力..."
+                    style={{ resize: "none", height: "6.5rem" }}
+                    placeholder="例：夕暮れの海辺で本を読む猫"
                   />
                 </div>
 
-                <div>
+                <div style={{ marginBottom: "1.25rem" }}>
                   <Label>アートスタイル</Label>
                   <SelectComp value={style} onChange={e => setStyle(e.target.value)} options={Object.keys(PROMPT_MAPPINGS.style)} />
                 </div>
 
-                <div>
+                <div style={{ marginBottom: "1.25rem" }}>
                   <Label>画質レベル</Label>
                   <SelectComp value={quality} onChange={e => setQuality(e.target.value)} options={Object.keys(PROMPT_MAPPINGS.quality)} />
                 </div>
 
-                <div>
+                <div style={{ marginBottom: "1.25rem" }}>
                   <Label>ライティング</Label>
                   <SelectComp value={lighting} onChange={e => setLighting(e.target.value)} options={Object.keys(PROMPT_MAPPINGS.lighting)} />
                 </div>
 
-                <div>
+                <div style={{ marginBottom: "1.25rem" }}>
                   <Label>構図</Label>
                   <SelectComp value={composition} onChange={e => setComposition(e.target.value)} options={Object.keys(PROMPT_MAPPINGS.composition)} />
                 </div>
 
-                <div>
+                <div style={{ marginBottom: "1.75rem" }}>
                   <Label>画像サイズ</Label>
                   <SelectComp value={size} onChange={e => setSize(e.target.value)} options={Object.keys(ASPECT_RATIO_MAPPINGS)} />
                 </div>
 
-                <div className="mt-2">
-                  <button
-                    onClick={handleGenerate}
-                    disabled={isGenerating}
-                    className="clay-btn w-full py-4 font-bold text-white flex items-center justify-center gap-2 text-lg"
-                    style={{ cursor: isGenerating ? 'not-allowed' : 'pointer' }}
-                  >
-                    {isGenerating ? (
-                      <>
-                        <IconLoader size={24} />
-                        <span>生成しています...</span>
-                      </>
-                    ) : (
-                      <>
-                        <IconSparkles />
-                        <span>画像をみつける</span>
-                      </>
-                    )}
-                  </button>
-                </div>
+                <button
+                  onClick={handleGenerate}
+                  disabled={isGenerating}
+                  className="clay-btn w-full"
+                  style={{ padding: "1rem", fontWeight: 800, color: "white", fontSize: "1.1rem", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem", cursor: isGenerating ? "not-allowed" : "pointer", opacity: isGenerating ? 0.85 : 1 }}
+                >
+                  {isGenerating ? (
+                    <><IconLoader size={22} /><span>{phaseText[phase]}</span></>
+                  ) : (
+                    <><IconSparkles size={20} /><span>画像をみつける</span></>
+                  )}
+                </button>
+
+                {/* 進捗インジケーター */}
+                {isGenerating && (
+                  <div style={{ marginTop: "1rem", display: "flex", gap: "0.5rem", alignItems: "center" }}>
+                    <div style={{ flex: 1, height: "6px", borderRadius: "99px", background: "#cdd3de", overflow: "hidden" }}>
+                      <div style={{ height: "100%", width: phase === "translating" ? "40%" : "80%", background: "linear-gradient(90deg, #a78bfa, #818cf8)", borderRadius: "99px", transition: "width 0.6s ease" }} />
+                    </div>
+                    <span style={{ fontSize: "0.7rem", color: "#94a3b8", whiteSpace: "nowrap" }}>{phase === "translating" ? "1/2" : "2/2"}</span>
+                  </div>
+                )}
               </div>
 
               {/* 右パネル：プレビュー */}
-              <div className="clay-panel flex-1 flex flex-col" style={{ minHeight: '480px', padding: '2rem', position: 'relative', flex: '1 1 300px' }}>
+              <div className="clay-panel" style={{ flex: 1, minHeight: "500px", padding: "2rem", position: "relative", display: "flex", flexDirection: "column" }}>
 
-                {/* デフォルト・ローディング */}
-                {!generatedImage && !error && (
-                  <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', textAlign: 'center', color: '#94a3b8' }}>
-                    {isGenerating ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.25rem' }}>
-                        <div className="clay-btn" style={{ padding: '1rem', borderRadius: '9999px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <IconLoader size={40} />
-                        </div>
-                        <p style={{ fontSize: '1.25rem', fontWeight: 700, color: '#475569' }}>AIが絵の具を混ぜています...</p>
-                        <p style={{ fontSize: '0.875rem', color: '#64748b' }}>完成まで少しだけお待ちください</p>
-                      </div>
-                    ) : (
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', opacity: 0.6 }}>
-                        <div className="clay-image-box" style={{ width: '6rem', height: '6rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#cbd5e1' }}>
-                          <IconImage />
-                        </div>
-                        <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#475569', marginBottom: '0.5rem' }}>キャンバスは真っ白です</h2>
-                        <p style={{ color: '#64748b', fontWeight: 500 }}>左の設定を選んで、「みつける」ボタンを押してね！</p>
-                      </div>
-                    )}
+                {/* idle */}
+                {phase === "idle" && (
+                  <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: "#94a3b8", textAlign: "center" }}>
+                    <div className="clay-image-box" style={{ width: "5rem", height: "5rem", marginBottom: "1.25rem", display: "flex", alignItems: "center", justifyContent: "center", opacity: 0.5 }}>
+                      <IconImage />
+                    </div>
+                    <h2 style={{ fontSize: "1.4rem", fontWeight: 700, color: "#475569", marginBottom: "0.5rem" }}>キャンバスは真っ白です</h2>
+                    <p style={{ color: "#64748b" }}>左の設定を選んで「みつける」ボタンを押してね！</p>
                   </div>
                 )}
 
-                {/* エラー */}
-                {error && (
-                  <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', textAlign: 'center' }}>
-                    <div className="clay-image-box" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', maxWidth: '28rem' }}>
-                      <IconAlertCircle />
-                      <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#f43f5e', margin: '1rem 0 0.5rem' }}>ちょっと問題がおきました</h2>
-                      <p style={{ fontSize: '0.875rem', color: '#475569', marginBottom: '1.5rem' }}>{error}</p>
+                {/* loading */}
+                {isGenerating && (
+                  <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "1.5rem" }}>
+                    <div className="clay-btn" style={{ padding: "1.25rem", borderRadius: "9999px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <IconLoader size={44} />
+                    </div>
+                    <div style={{ textAlign: "center" }}>
+                      <p style={{ fontSize: "1.2rem", fontWeight: 700, color: "#475569" }}>
+                        {phase === "translating" ? "🌐 日本語を翻訳中..." : "🎨 AIが絵の具を混ぜています..."}
+                      </p>
+                      <p style={{ fontSize: "0.875rem", color: "#64748b", marginTop: "0.25rem" }}>完成まで少しだけお待ちください</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* error */}
+                {phase === "error" && (
+                  <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "1.5rem" }}>
+                    <div className="clay-image-box" style={{ padding: "2rem", display: "flex", flexDirection: "column", alignItems: "center", maxWidth: "26rem", textAlign: "center" }}>
+                      <IconAlert />
+                      <h2 style={{ fontSize: "1.15rem", fontWeight: 700, color: "#f43f5e", margin: "1rem 0 0.5rem" }}>ちょっと問題がおきました</h2>
+                      <p style={{ fontSize: "0.85rem", color: "#475569", marginBottom: "1.5rem", lineHeight: 1.7 }}>{errorMsg}</p>
                       <button
-                        onClick={() => setError(null)}
+                        onClick={() => { setPhase("idle"); setErrorMsg(null); }}
                         className="clay-btn-secondary"
-                        style={{ padding: '0.5rem 1.5rem', color: '#475569', fontWeight: 700, cursor: 'pointer' }}
+                        style={{ padding: "0.5rem 1.5rem", fontWeight: 700, color: "#475569", cursor: "pointer" }}
                       >やり直す</button>
                     </div>
                   </div>
                 )}
 
-                {/* 成功 */}
-                {generatedImage && !isGenerating && (
-                  <div className="custom-scrollbar" style={{ display: 'flex', flexDirection: 'column', height: '100%', overflowY: 'auto' }}>
+                {/* done */}
+                {phase === "done" && generatedImage && (
+                  <div className="custom-scrollbar" style={{ display: "flex", flexDirection: "column", height: "100%", overflowY: "auto", gap: "1.5rem" }}>
 
                     {/* 画像 */}
-                    <div className="clay-image-box" style={{ position: 'relative', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '2rem', padding: '1rem', minHeight: '300px' }}>
+                    <div className="clay-image-box" style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem", minHeight: "280px" }}>
                       <img
                         src={generatedImage}
-                        alt="Generated AI Art"
-                        style={{ maxWidth: '100%', maxHeight: '60vh', objectFit: 'contain', borderRadius: '0.75rem' }}
+                        alt="AI生成画像"
+                        style={{ maxWidth: "100%", maxHeight: "60vh", objectFit: "contain", borderRadius: "0.75rem" }}
                       />
                       <button
                         onClick={handleDownload}
                         className="clay-btn"
-                        style={{ position: 'absolute', bottom: '1.5rem', right: '1.5rem', padding: '0.75rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'white', cursor: 'pointer' }}
-                        title="画像を保存"
+                        style={{ position: "absolute", bottom: "1rem", right: "1rem", padding: "0.6rem 1rem", display: "flex", alignItems: "center", gap: "0.4rem", color: "white", fontWeight: 700, fontSize: "0.85rem", cursor: "pointer" }}
                       >
-                        <IconDownload />
-                        <span style={{ fontWeight: 700, fontSize: '0.875rem' }}>保存する</span>
+                        <IconDownload />保存する
                       </button>
                     </div>
 
                     {/* プロンプト表示 */}
-                    <div className="clay-image-box" style={{ padding: '1.25rem' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                        <h3 style={{ fontSize: '0.875rem', fontWeight: 700, color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <span style={{ color: '#a78bfa' }}>✦</span>
-                          AIにお願いした魔法の言葉（プロンプト）
-                        </h3>
+                    <div className="clay-image-box" style={{ padding: "1.25rem" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
+                        <span style={{ fontSize: "0.8rem", fontWeight: 700, color: "#64748b", display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                          <IconSparkles size={14} color="#a78bfa" />
+                          AIにお願いしたプロンプト
+                        </span>
                         <button
                           onClick={handleCopyPrompt}
                           className="clay-btn-secondary"
-                          style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.375rem 0.75rem', fontSize: '0.75rem', fontWeight: 700, color: '#475569', cursor: 'pointer' }}
+                          style={{ padding: "0.35rem 0.75rem", display: "flex", alignItems: "center", gap: "0.4rem", fontSize: "0.75rem", fontWeight: 700, color: "#475569", cursor: "pointer" }}
                         >
-                          {copySuccess ? (
-                            <><IconCheck /><span>コピー完了！</span></>
-                          ) : (
-                            <><IconCopy /><span>コピーする</span></>
-                          )}
+                          {copySuccess ? <><IconCheck />コピー完了！</> : <><IconCopy />コピーする</>}
                         </button>
                       </div>
-                      <div style={{ background: 'rgba(255,255,255,0.5)', padding: '1rem', borderRadius: '1rem', color: '#475569', fontSize: '0.875rem', fontFamily: 'monospace', lineHeight: '1.6', wordBreak: 'break-all', boxShadow: 'inset 2px 2px 8px rgba(0,0,0,0.05)' }}>
+                      <div style={{ background: "rgba(255,255,255,0.5)", padding: "0.875rem", borderRadius: "1rem", fontSize: "0.8rem", fontFamily: "monospace", color: "#475569", lineHeight: 1.7, wordBreak: "break-all" }}>
                         {finalPrompt}
                       </div>
                     </div>
+
+                    {/* 再生成ボタン */}
+                    <button
+                      onClick={() => { setPhase("idle"); setGeneratedImage(null); setFinalPrompt(null); }}
+                      className="clay-btn-secondary"
+                      style={{ padding: "0.75rem", fontWeight: 700, color: "#475569", cursor: "pointer", textAlign: "center" }}
+                    >
+                      ✦ 別の画像を作る
+                    </button>
 
                   </div>
                 )}
 
               </div>
             </div>
-
           </main>
 
-          <footer style={{ textAlign: 'center', marginTop: '2rem', color: '#94a3b8', fontSize: '0.75rem' }}>
-            イメージみっけ &copy; Smile Plus Consulting
+          <footer style={{ textAlign: "center", marginTop: "2.5rem", color: "#94a3b8", fontSize: "0.75rem" }}>
+            イメージみっけ &copy; Smile Plus Consulting &nbsp;|&nbsp; Powered by Gemini AI
           </footer>
         </div>
       );
     }
 
-    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   </script>
 </body>
 </html>
