@@ -1,132 +1,11 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>イメージみっけ</title>
-  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800&display=swap" rel="stylesheet" />
-  <style>
-    *{font-family:'Noto Sans JP',sans-serif}
-    .clay-panel{background:#e8ecf2;border-radius:32px;box-shadow:12px 12px 24px #cdd3de,-12px -12px 24px #fff,inset 2px 2px 4px rgba(255,255,255,.8),inset -2px -2px 4px rgba(0,0,0,.02)}
-    .clay-input{background:#e8ecf2;border-radius:16px;border:2px solid transparent;box-shadow:inset 6px 6px 12px #cdd3de,inset -6px -6px 12px #fff;transition:all .2s ease;outline:none}
-    .clay-input:focus{border:2px solid #a78bfa;box-shadow:inset 8px 8px 16px #cdd3de,inset -8px -8px 16px #fff}
-    .clay-btn{background:linear-gradient(135deg,#a78bfa,#818cf8);border-radius:20px;box-shadow:6px 6px 12px #cdd3de,-6px -6px 12px #fff,inset 4px 4px 8px rgba(255,255,255,.4),inset -4px -4px 8px rgba(0,0,0,.1);transition:all .15s ease;cursor:pointer;border:none;color:#fff}
-    .clay-btn:hover:not(:disabled){transform:translateY(-2px);box-shadow:8px 8px 16px #cdd3de,-8px -8px 16px #fff,inset 4px 4px 8px rgba(255,255,255,.4),inset -4px -4px 8px rgba(0,0,0,.1)}
-    .clay-btn:active,.clay-btn:disabled{transform:translateY(2px);box-shadow:inset 6px 6px 12px rgba(0,0,0,.15),inset -6px -6px 12px rgba(255,255,255,.3);opacity:.7;cursor:not-allowed}
-    .clay-btn-sm{background:#e8ecf2;border-radius:12px;box-shadow:4px 4px 8px #cdd3de,-4px -4px 8px #fff;border:none;cursor:pointer}
-    .clay-btn-sm:active{box-shadow:inset 4px 4px 8px #cdd3de,inset -4px -4px 8px #fff}
-    .clay-image-box{background:#e8ecf2;border-radius:24px;box-shadow:inset 8px 8px 16px #cdd3de,inset -8px -8px 16px #fff}
-    .spin{animation:spin 1s linear infinite}
-    @keyframes spin{to{transform:rotate(360deg)}}
-    .pulse{animation:pulse 2s cubic-bezier(.4,0,.6,1) infinite}
-    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
-    
-    /* セレクトボックスの凹型デザインと調整 */
-    select{
-      -webkit-appearance: none; /* Safari等のブラウザ標準デザインを強制リセット */
-      -moz-appearance: none;
-      appearance: none;
-      background: #e8ecf2;
-      border-radius: 16px; /* テキストエリアと同じ丸み */
-      border: 2px solid transparent;
-      box-shadow: inset 6px 6px 12px #cdd3de, inset -6px -6px 12px #ffffff; /* 凹型の立体感 */
-      outline: none;
-      width: 100%;
-      height: 54px; /* 高さをしっかり固定してふっくらさせる */
-      padding: 0 40px 0 20px;
-      font-size: 14px;
-      font-weight: 700;
-      color: #475569;
-      cursor: pointer;
-      transition: all .2s ease;
-      box-sizing: border-box;
-    }
-    select:focus{
-      border: 2px solid #a78bfa;
-      box-shadow: inset 8px 8px 16px #cdd3de, inset -8px -8px 16px #ffffff;
-    }
-    
-    textarea{background:transparent;outline:none;width:100%;padding:16px 20px;resize:none;height:120px;font-size:14px;color:#334155;font-weight:700;box-sizing:border-box}
-    textarea::placeholder{color:#94a3b8;font-weight:500}
-    .scrollbar::-webkit-scrollbar{width:8px}
-    .scrollbar::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:10px}
-  </style>
-</head>
-<body style="margin:0;background:#e8ecf2">
-<div id="root"></div>
+import React, { useState, useRef, useEffect } from 'react';
+import { Copy, Check, Image as ImageIcon, Loader2, AlertCircle, Download, Sparkles, UploadCloud, X, FileText, Lock, Key, ChevronRight } from 'lucide-react';
 
-<script type="text/babel">
-const { useState, useRef } = React;
+// === 設定と定数 ===
+const WORKER_URL = "https://image-mikke.yymmatsu.workers.dev"; 
+const MAX_FREE_USAGE = 3;
+const STRIPE_PAYMENT_URL = "https://buy.stripe.com/28EbJ0fTc83b7WT5sMcV20C"; 
 
-// ============================================================
-// ★ Cloudflare WorkerのURLをここに入力
-// 例: https://image-mikke.yourname.workers.dev
-// ============================================================
-const WORKER_URL = "https://image-mikke.yymmatsu.workers.dev";
-
-// インラインSVGアイコン (CDN不要・確実に動く)
-const IconSparkles = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/>
-  </svg>
-);
-const IconLoader = ({size=24}) => (
-  <svg className="spin" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
-  </svg>
-);
-const IconDownload = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
-  </svg>
-);
-const IconCopy = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
-  </svg>
-);
-const IconCheck = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="20 6 9 17 4 12"/>
-  </svg>
-);
-const IconAlert = () => (
-  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#fb7185" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-  </svg>
-);
-const IconImage = ({size=40}) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>
-  </svg>
-);
-const IconX = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M18 6 6 18"/><path d="m6 6 12 12"/>
-  </svg>
-);
-const IconUpload = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
-  </svg>
-);
-const IconChevron = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-    <path d="M6 9l6 6 6-6"/>
-  </svg>
-);
-const IconFile = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/>
-  </svg>
-);
-
-// 設定
 const PROMPT_MAPPINGS = {
   style: {
     "写真風": "photorealistic, professional photography",
@@ -156,242 +35,652 @@ const PROMPT_MAPPINGS = {
   }
 };
 
-const ASPECT_RATIOS = {
+const ASPECT_RATIO_MAPPINGS = {
   "SNS投稿 (3:4)": "3:4",
   "SNSリール (9:16)": "9:16",
   "横長コンテンツ (16:9)": "16:9",
   "正方形 (1:1)": "1:1"
 };
 
-function App() {
-  const [content, setContent]       = useState("夕暮れの海辺で本を読む猫");
-  const [style, setStyle]           = useState("写真風");
-  const [quality, setQuality]       = useState("最高品質");
-  const [lighting, setLighting]     = useState("自然光");
-  const [composition, setComp]      = useState("全体像");
-  const [size, setSize]             = useState("正方形 (1:1)");
-  const [isGenerating, setGenerating] = useState(false);
-  const [generatedImage, setImage]  = useState(null);
-  const [finalPrompt, setPrompt]    = useState(null);
-  const [error, setError]           = useState(null);
-  const [copied, setCopied]         = useState(false);
-  const [refImage, setRefImage]     = useState(null);
-  const [isDragging, setDragging]   = useState(false);
-  const fileRef = useRef(null);
+const fetchWithRetry = async (url, options, maxRetries = 5) => {
+  let delay = 1000;
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      const response = await fetch(url, options);
+      if (!response.ok) {
+        let errorMessage = `HTTP error! status: ${response.status}`;
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error?.message || errorMessage;
+        } catch (e) {}
+        
+        if (response.status === 400 || response.status === 401 || response.status === 403) {
+          throw new Error(`エラー(${response.status}): ${errorMessage}`);
+        }
+        throw new Error(errorMessage);
+      }
+      return response;
+    } catch (error) {
+      if (error.message.includes('エラー(4') || i === maxRetries - 1) {
+        throw new Error(`通信に失敗しました詳細: ${error.message}`);
+      }
+      await new Promise(res => setTimeout(res, delay));
+      delay *= 2;
+    }
+  }
+};
+
+export default function App() {
+  // === 状態管理 ===
+  const [content, setContent] = useState('夕暮れの海辺で本を読む猫');
+  const [style, setStyle] = useState('写真風');
+  const [quality, setQuality] = useState('最高品質');
+  const [lighting, setLighting] = useState('自然光');
+  const [composition, setComposition] = useState('全体像');
+  const [size, setSize] = useState('正方形 (1:1)');
+
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generatedImage, setGeneratedImage] = useState(null);
+  const [finalPrompt, setFinalPrompt] = useState(null);
+  const [error, setError] = useState(null);
+  const [copySuccess, setCopySuccess] = useState(false);
+
+  const [referenceImage, setReferenceImage] = useState(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isFileProcessing, setIsFileProcessing] = useState(false);
+  const fileInputRef = useRef(null);
+
+  // === マネタイズ機能用状態 ===
+  const [usageCount, setUsageCount] = useState(0);
+  const [isUnlocked, setIsUnlocked] = useState(false);
+  const [showPasswordInput, setShowPasswordInput] = useState(false);
+  const [passwordInput, setPasswordInput] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [isUnlocking, setIsUnlocking] = useState(false); 
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedCount = localStorage.getItem('mikke_usage_count');
+      const savedUnlock = localStorage.getItem('mikke_is_unlocked');
+      if (savedCount) setUsageCount(parseInt(savedCount, 10));
+      if (savedUnlock === 'true') setIsUnlocked(true);
+    }
+    
+    if (!document.getElementById('noto-sans-jp-font')) {
+      const link = document.createElement('link');
+      link.id = 'noto-sans-jp-font';
+      link.rel = 'stylesheet';
+      link.href = 'https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800&display=swap';
+      document.head.appendChild(link);
+    }
+  }, []);
+
+  const incrementUsage = () => {
+    if (!isUnlocked) {
+      const newCount = usageCount + 1;
+      setUsageCount(newCount);
+      localStorage.setItem('mikke_usage_count', newCount.toString());
+    }
+  };
+
+  const handleUnlock = async () => {
+    if (!passwordInput.trim()) return;
+    
+    setIsUnlocking(true);
+    setPasswordError('');
+    
+    try {
+      const response = await fetch(`${WORKER_URL}/auth`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: passwordInput })
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok && data.success) {
+        setIsUnlocked(true);
+        localStorage.setItem('mikke_is_unlocked', 'true');
+        setShowPasswordInput(false);
+        setPasswordError('');
+        setUsageCount(0);
+        localStorage.setItem('mikke_usage_count', '0');
+      } else {
+        setPasswordError(data.error || 'パスワードが間違っています。');
+      }
+    } catch (err) {
+      setPasswordError('サーバーとの通信に失敗しました。');
+    } finally {
+      setIsUnlocking(false);
+    }
+  };
+
+  const isLimitReached = !isUnlocked && usageCount >= MAX_FREE_USAGE;
 
   const processFile = (file) => {
-    if (!["image/jpeg","image/png","image/webp"].includes(file.type)) {
-      setError("JPG、PNG、WebP画像をアップロードしてください。"); return;
+    if (isLimitReached) return;
+    
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+    if (!validTypes.includes(file.type)) {
+      setError("JPG, PNG, または PDFファイルをアップロードしてください。");
+      return;
     }
+
     const reader = new FileReader();
-    reader.onloadend = () => {
-      setRefImage({ base64: reader.result.split(",")[1], mimeType: file.type, dataUrl: reader.result });
-      setComp("指定なし (元画像に合わせる)");
+    reader.onloadend = async () => {
+      const base64String = reader.result.split(',')[1];
+      
+      if (file.type === 'application/pdf') {
+        setIsFileProcessing(true);
+        setError(null);
+        try {
+          const pdfInstruction = "このPDFドキュメントの内容を詳細に読み取り、画像生成AIに入力するための「日本語の情景説明」や「被写体の説明」を作成してください。出力は作成した説明文のみ（100文字〜200文字程度）としてください。";
+          
+          const textResponse = await fetchWithRetry(
+            `${WORKER_URL}/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: [{
+                  parts: [
+                    { text: pdfInstruction },
+                    { inlineData: { mimeType: 'application/pdf', data: base64String } }
+                  ]
+                }]
+              })
+            }
+          );
+          const textData = await textResponse.json();
+          const extractedText = textData.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+          if (extractedText) setContent(extractedText);
+          else throw new Error("PDFからテキストを抽出できませんでした。");
+        } catch (err) {
+          setError(err.message || "PDFの読み取り中にエラーが発生しました。");
+        } finally {
+          setIsFileProcessing(false);
+        }
+      } else {
+        setReferenceImage({
+          base64: base64String,
+          mimeType: file.type,
+          dataUrl: reader.result
+        });
+        setComposition('指定なし (元画像に合わせる)');
+      }
     };
     reader.readAsDataURL(file);
   };
 
   const handleDrop = (e) => {
-    e.preventDefault(); setDragging(false);
-    const f = e.dataTransfer.files[0]; if (f) processFile(f);
+    e.preventDefault();
+    setIsDragging(false);
+    if (isLimitReached) return;
+    const file = e.dataTransfer.files[0];
+    if (file) processFile(file);
+  };
+
+  const handleFileSelect = (e) => {
+    if (isLimitReached) return;
+    const file = e.target.files[0];
+    if (file) processFile(file);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const handleGenerate = async () => {
-    if (!content.trim()) { setError("画像の内容を入力してください。"); return; }
-    setGenerating(true); setError(null); setImage(null); setPrompt(null); setCopied(false);
-    try {
-      const parts = [content, PROMPT_MAPPINGS.style[style], PROMPT_MAPPINGS.quality[quality], PROMPT_MAPPINGS.lighting[lighting], PROMPT_MAPPINGS.composition[composition]].filter(Boolean).join(", ");
-      const builtPrompt = refImage ? `Modify the attached image strictly: ${parts}` : parts;
-      setPrompt(builtPrompt);
+    if (isLimitReached) return;
+    
+    if (!content.trim()) {
+      setError("画像の内容を入力してください。");
+      return;
+    }
 
-      const res = await fetch(`${WORKER_URL}/generate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          prompt: builtPrompt,
-          aspectRatio: ASPECT_RATIOS[size],
-          referenceImage: refImage ? { base64: refImage.base64, mimeType: refImage.mimeType } : null
-        })
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.error || "生成に失敗しました。");
-      setImage(`data:${data.mimeType};base64,${data.image}`);
-    } catch(err) {
+    setIsGenerating(true);
+    setError(null);
+    setGeneratedImage(null);
+    setFinalPrompt(null);
+    setCopySuccess(false);
+
+    try {
+      const translationInstruction = `Translate the following Japanese text to English. Output ONLY the English translation, without any quotes or explanations. Japanese: ${content}`;
+      const textResponse = await fetchWithRetry(
+        `${WORKER_URL}/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contents: [{ parts: [{ text: translationInstruction }] }] })
+        }
+      );
+      const textData = await textResponse.json();
+      let translatedContent = textData.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
+      translatedContent = translatedContent.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
+      if (!translatedContent) throw new Error("翻訳に失敗しました。");
+
+      let englishPrompt = [
+        translatedContent,
+        PROMPT_MAPPINGS.style[style],
+        PROMPT_MAPPINGS.quality[quality],
+        PROMPT_MAPPINGS.lighting[lighting],
+        PROMPT_MAPPINGS.composition[composition]
+      ].filter(Boolean).join(", ");
+      
+      if (referenceImage) {
+        englishPrompt = `Modify the attached image strictly according to this description: ${englishPrompt}`;
+      }
+      setFinalPrompt(englishPrompt);
+
+      const finalImagePrompt = `${englishPrompt}. Aspect ratio: ${ASPECT_RATIO_MAPPINGS[size]}.`;
+      const payloadParts = [{ text: finalImagePrompt }];
+      if (referenceImage) {
+        payloadParts.push({ inlineData: { mimeType: referenceImage.mimeType, data: referenceImage.base64 } });
+      }
+
+      const imageResponse = await fetchWithRetry(
+        `${WORKER_URL}/v1beta/models/gemini-2.5-flash-image-preview:generateContent`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: payloadParts }],
+            generationConfig: { responseModalities: ['TEXT', 'IMAGE'] }
+          })
+        }
+      );
+
+      const imageData = await imageResponse.json();
+      if (imageData.candidates?.[0]?.finishReason && imageData.candidates[0].finishReason !== 'STOP') {
+        throw new Error(`画像生成がブロックされました (理由: ${imageData.candidates[0].finishReason})。別の内容をお試しください。`);
+      }
+
+      const base64Image = imageData.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
+      if (base64Image) {
+        setGeneratedImage(`data:image/png;base64,${base64Image}`);
+        incrementUsage(); 
+      } else {
+        throw new Error("画像データが取得できませんでした。");
+      }
+    } catch (err) {
       setError(err.message || "エラーが発生しました。");
     } finally {
-      setGenerating(false);
+      setIsGenerating(false);
     }
   };
 
-  const handleCopy = () => {
+  const handleCopyPrompt = () => {
     if (!finalPrompt) return;
-    navigator.clipboard.writeText(finalPrompt).then(() => { setCopied(true); setTimeout(()=>setCopied(false),2000); });
+    const textArea = document.createElement("textarea");
+    textArea.value = finalPrompt;
+    document.body.appendChild(textArea);
+    textArea.select();
+    try {
+      document.execCommand('copy');
+      setCopySuccess(true);
+      setTimeout(() => setCopySuccess(false), 2000);
+    } catch (err) {}
+    document.body.removeChild(textArea);
   };
 
   const handleDownload = () => {
     if (!generatedImage) return;
-    const a = document.createElement("a"); a.href = generatedImage;
-    a.download = `mikke-image-${Date.now()}.png`; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    const link = document.createElement('a');
+    link.href = generatedImage;
+    link.download = `mikke-image-${Date.now()}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
-  const SelectField = ({label, value, onChange, options}) => (
-    <div style={{marginBottom:0}}>
-      <label style={{display:"block",fontSize:12,fontWeight:700,color:"#64748b",marginBottom:6,marginLeft:4}}>{label}</label>
-      <div style={{position:"relative"}}>
-        <select value={value} onChange={e=>onChange(e.target.value)}>
-          {options.map(o=><option key={o} value={o}>{o}</option>)}
-        </select>
-        <div style={{position:"absolute",right:16,top:"50%",transform:"translateY(-50%)",pointerEvents:"none",color:"#94a3b8"}}>
-          <IconChevron />
-        </div>
+  const Label = ({ children }) => (
+    <label className="block text-sm font-bold text-slate-500 mb-2 ml-1">
+      {children}
+    </label>
+  );
+
+  const Select = ({ value, onChange, options, disabled }) => (
+    <div className="relative">
+      <select
+        value={value}
+        onChange={onChange}
+        disabled={disabled}
+        className={`clay-input w-full appearance-none font-medium py-3 px-4 text-sm ${disabled ? 'text-slate-400 bg-slate-100 cursor-not-allowed' : 'text-slate-700 cursor-pointer'}`}
+      >
+        {options.map((opt) => (
+          <option key={opt} value={opt}>{opt}</option>
+        ))}
+      </select>
+      <div className={`pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 ${disabled ? 'text-slate-300' : 'text-slate-400'}`}>
+        <svg className="fill-current h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+          <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
+        </svg>
       </div>
     </div>
   );
 
-  return (
-    <div style={{minHeight:"100vh",background:"#e8ecf2",padding:"24px",display:"flex",flexDirection:"column"}}>
+  const renderBanner = () => {
+    if (isUnlocked) return null; 
 
-      {/* ヘッダー */}
-      <header style={{textAlign:"center",marginBottom:32,paddingTop:16}}>
-        <h1 style={{fontSize:32,fontWeight:800,background:"linear-gradient(135deg,#8b5cf6,#6366f1)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",display:"inline-flex",alignItems:"center",gap:10}}>
-          <span style={{color:"#8b5cf6",WebkitTextFillColor:"#8b5cf6"}}><IconSparkles /></span>
+    if (usageCount >= MAX_FREE_USAGE) {
+      return (
+        <div className="bg-rose-500 text-white p-3 rounded-2xl shadow-md mb-6 flex flex-col md:flex-row items-center justify-between gap-4 animate-in fade-in slide-in-from-top-4 border-2 border-rose-600/50">
+          <div className="flex items-center gap-2 font-bold shrink-0">
+            <AlertCircle className="w-5 h-5 text-rose-200" />
+            <span>⚠️ 無料体験が終了しました</span>
+          </div>
+          <div className="flex items-center gap-3 w-full md:w-auto">
+            <a 
+              href={STRIPE_PAYMENT_URL} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="bg-white text-rose-600 px-4 py-2 rounded-xl font-bold text-sm shadow-sm hover:bg-rose-50 transition-colors flex items-center gap-1 flex-1 justify-center whitespace-nowrap"
+            >
+              ご購入はこちら <ChevronRight className="w-4 h-4" />
+            </a>
+            <button 
+              onClick={() => setShowPasswordInput(!showPasswordInput)}
+              className="text-rose-100 hover:text-white text-xs underline font-medium whitespace-nowrap shrink-0"
+            >
+              購入済みの方
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    const remaining = MAX_FREE_USAGE - usageCount;
+    let bannerText = "🎁 今なら3回まで無料でお試しいただけます（登録不要）";
+    if (usageCount > 0) {
+      bannerText = `🎁 無料体験 残り${remaining}回（全3回）`;
+    }
+
+    return (
+      <div className="bg-gradient-to-r from-amber-200 to-yellow-400 p-3 rounded-2xl shadow-sm mb-6 flex items-center justify-center border-2 border-yellow-100">
+        <span className="font-bold text-yellow-900 text-xs sm:text-sm md:text-base drop-shadow-sm flex items-center gap-2 text-center">
+          <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-600 shrink-0" />
+          {bannerText}
+        </span>
+      </div>
+    );
+  };
+
+  return (
+    <div className="mikke-app min-h-screen bg-[#e8ecf2] text-slate-700 p-3 sm:p-4 md:p-8 flex flex-col font-medium">
+      <style dangerouslySetInnerHTML={{__html: `
+        .mikke-app, .mikke-app * { font-family: 'Noto Sans JP', sans-serif !important; }
+        .clay-panel { background: #e8ecf2; border-radius: 24px; box-shadow: 8px 8px 16px #cdd3de, -8px -8px 16px #ffffff, inset 2px 2px 4px rgba(255,255,255,0.8), inset -2px -2px 4px rgba(0,0,0,0.02); }
+        @media (min-width: 768px) {
+          .clay-panel { border-radius: 32px; box-shadow: 12px 12px 24px #cdd3de, -12px -12px 24px #ffffff, inset 2px 2px 4px rgba(255,255,255,0.8), inset -2px -2px 4px rgba(0,0,0,0.02); }
+        }
+        .clay-input { background: #e8ecf2; border-radius: 16px; border: 2px solid transparent; box-shadow: inset 6px 6px 12px #cdd3de, inset -6px -6px 12px #ffffff; transition: all 0.2s ease; outline: none; }
+        .clay-input:focus { border: 2px solid #a78bfa; box-shadow: inset 8px 8px 16px #cdd3de, inset -8px -8px 16px #ffffff; }
+        .clay-btn { background: linear-gradient(135deg, #a78bfa, #818cf8); border-radius: 20px; box-shadow: 6px 6px 12px #cdd3de, -6px -6px 12px #ffffff, inset 4px 4px 8px rgba(255,255,255,0.4), inset -4px -4px 8px rgba(0,0,0,0.1); transition: all 0.15s ease; }
+        .clay-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 8px 8px 16px #cdd3de, -8px -8px 16px #ffffff, inset 4px 4px 8px rgba(255,255,255,0.4), inset -4px -4px 8px rgba(0,0,0,0.1); }
+        .clay-btn:active:not(:disabled), .clay-btn:disabled { transform: translateY(2px); box-shadow: inset 6px 6px 12px rgba(0,0,0,0.15), inset -6px -6px 12px rgba(255,255,255,0.3); }
+        .clay-btn-secondary { background: #e8ecf2; border-radius: 12px; box-shadow: 4px 4px 8px #cdd3de, -4px -4px 8px #ffffff; }
+        .clay-btn-secondary:active { box-shadow: inset 4px 4px 8px #cdd3de, inset -4px -4px 8px #ffffff; }
+        .clay-image-box { background: #e8ecf2; border-radius: 24px; box-shadow: inset 8px 8px 16px #cdd3de, inset -8px -8px 16px #ffffff; }
+        .custom-scrollbar::-webkit-scrollbar { width: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+      `}} />
+
+      <header className="mb-4 text-center pt-2 sm:pt-4">
+        <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-violet-500 to-indigo-500 inline-flex items-center gap-2 md:gap-3 drop-shadow-sm">
+          <Sparkles className="w-6 h-6 sm:w-8 sm:h-8 text-violet-500" />
           イメージみっけ
         </h1>
-        <p style={{color:"#64748b",marginTop:8,fontWeight:700,fontSize:13,letterSpacing:1}}>プロンプト不要で、とっておきの1枚を作ろう</p>
+        <p className="text-slate-500 mt-2 font-bold text-xs sm:text-sm tracking-wide">
+          プロンプト不要で、とっておきの1枚を作ろう
+        </p>
       </header>
 
-      {/* メインレイアウト */}
-      <div className="flex flex-col md:flex-row gap-7 flex-1 w-full max-w-[1200px] mx-auto pb-6">
+      <div className="max-w-7xl w-full mx-auto">
+        {renderBanner()}
 
-        {/* 左パネル */}
-        <div className="clay-panel w-full md:w-[400px] shrink-0 p-8 flex flex-col gap-5">
-
-          {/* テキストエリア */}
-          <div>
-            <label style={{display:"block",fontSize:13,fontWeight:700,color:"#64748b",marginBottom:8,marginLeft:4}}>なにを描きたい？ (画像の内容)</label>
-            <div
-              className="clay-input"
-              style={{display:"flex",flexDirection:"column",overflow:"hidden",border: isDragging ? "2px solid #a78bfa" : "2px solid transparent",transform: isDragging ? "scale(1.01)" : "none"}}
-              onDragOver={e=>{e.preventDefault();setDragging(true)}}
-              onDragLeave={()=>setDragging(false)}
-              onDrop={handleDrop}
+        {showPasswordInput && !isUnlocked && (
+          <div className="bg-white p-4 rounded-2xl shadow-sm mb-6 flex flex-col md:flex-row items-center gap-3 border border-slate-200 animate-in fade-in zoom-in-95">
+            <Lock className="w-5 h-5 text-slate-400 shrink-0" />
+            <input 
+              type="text" 
+              placeholder="サンクスメールに記載されたパスワードを入力"
+              value={passwordInput}
+              onChange={(e) => setPasswordInput(e.target.value)}
+              className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none focus:border-violet-400 text-sm w-full"
+            />
+            <button 
+              onClick={handleUnlock}
+              disabled={isUnlocking}
+              className="bg-slate-800 text-white px-5 py-2 rounded-xl font-bold text-sm hover:bg-slate-700 transition-colors w-full md:w-auto whitespace-nowrap disabled:opacity-70 flex items-center justify-center gap-2"
             >
-              <textarea value={content} onChange={e=>setContent(e.target.value)} placeholder="生成したい画像の説明を入力..." />
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"0 12px 12px"}}>
-                <span style={{fontSize:11,color:"#94a3b8",fontWeight:700,display:"flex",alignItems:"center",gap:6}}>
-                  <IconUpload /> JPG / PDF をドロップ
-                </span>
-                <button
-                  className="clay-btn-sm"
-                  style={{fontSize:12,padding:"6px 12px",fontWeight:700,color:"#475569",display:"flex",alignItems:"center",gap:6}}
-                  onClick={()=>fileRef.current?.click()}
-                >
-                  <IconFile /> 選択
-                </button>
-                <input type="file" ref={fileRef} onChange={e=>{const f=e.target.files[0];if(f)processFile(f);fileRef.current.value="";}} accept="image/jpeg,image/png,image/webp" style={{display:"none"}} />
-              </div>
-            </div>
+              {isUnlocking ? <Loader2 className="w-4 h-4 animate-spin shrink-0" /> : null}
+              {isUnlocking ? '確認中...' : '解除する'}
+            </button>
+            {passwordError && <span className="text-rose-500 text-xs font-bold w-full md:w-auto">{passwordError}</span>}
+          </div>
+        )}
 
-            {refImage && (
-              <div style={{marginTop:12,display:"inline-flex",alignItems:"center",gap:12,padding:"8px 16px 8px 8px",background:"rgba(255,255,255,0.6)",borderRadius:12,border:"1px solid #e2e8f0"}}>
-                <img src={refImage.dataUrl} style={{width:40,height:40,objectFit:"cover",borderRadius:8,border:"1px solid #e2e8f0"}} alt="ref" />
-                <div>
-                  <div style={{fontSize:12,fontWeight:700,color:"#7c3aed"}}>元画像セット完了！</div>
-                  <div style={{fontSize:10,color:"#64748b"}}>この画像を元に修正します</div>
+        <main className="flex flex-col lg:flex-row gap-6 lg:gap-8 flex-1">
+          <aside className="clay-panel w-full lg:w-[400px] flex-shrink-0 p-5 md:p-8 flex flex-col gap-5 md:gap-6 relative">
+            
+            {isLimitReached && (
+              <div className="absolute inset-0 bg-slate-50/50 backdrop-blur-[2px] z-10 rounded-[24px] md:rounded-[32px] flex flex-col items-center justify-center p-6 text-center">
+                <div className="bg-white p-6 rounded-3xl shadow-lg border border-slate-100 flex flex-col items-center gap-4 w-full">
+                  <Key className="w-12 h-12 text-slate-300 mb-2" />
+                  <h3 className="text-lg sm:text-xl font-bold text-slate-700">制限に達しました</h3>
+                  <p className="text-xs sm:text-sm text-slate-500 font-medium leading-relaxed">
+                    無料体験は終了しました。<br/>引き続きご利用いただくにはご購入が必要です。
+                  </p>
+                  <a 
+                    href={STRIPE_PAYMENT_URL} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="clay-btn w-full py-3 mt-2 font-bold text-white text-center flex items-center justify-center gap-2 text-sm sm:text-base"
+                  >
+                    ご購入ページへ
+                  </a>
                 </div>
-                <button className="clay-btn-sm" style={{padding:4,borderRadius:"50%",marginLeft:4}} onClick={()=>{setRefImage(null);setComp("全体像");}}>
-                  <IconX />
-                </button>
               </div>
             )}
-          </div>
 
-          <SelectField label="アートスタイル" value={style} onChange={setStyle} options={Object.keys(PROMPT_MAPPINGS.style)} />
-          <SelectField label="画質レベル" value={quality} onChange={setQuality} options={Object.keys(PROMPT_MAPPINGS.quality)} />
-          <SelectField label="ライティング" value={lighting} onChange={setLighting} options={Object.keys(PROMPT_MAPPINGS.lighting)} />
-          <SelectField label="構図" value={composition} onChange={setComp} options={Object.keys(PROMPT_MAPPINGS.composition)} />
-          <SelectField label="画像サイズ" value={size} onChange={setSize} options={Object.keys(ASPECT_RATIOS)} />
-
-          <button className="clay-btn" disabled={isGenerating} onClick={handleGenerate}
-            style={{padding:"20px",fontSize:16,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",gap:8,marginTop:8,width:"100%"}}>
-            {isGenerating
-              ? <><IconLoader size={22} /> 生成しています...</>
-              : <><IconSparkles /> {refImage ? "元画像から修正する" : "画像をみつける"}</>
-            }
-          </button>
-        </div>
-
-        {/* 右パネル */}
-        <div className="clay-panel flex-1 min-w-[300px] p-7 flex flex-col relative">
-
-          {/* 初期・ローディング */}
-          {!generatedImage && !error && (
-            <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24,textAlign:"center"}}>
-              {isGenerating ? (
-                <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:20}}>
-                  <div className="clay-btn" style={{padding:16,borderRadius:"50%",cursor:"default"}}>
-                    <IconLoader size={40} />
-                  </div>
-                  <p style={{fontSize:18,fontWeight:700,color:"#475569"}}>AIが絵の具を混ぜています...</p>
-                  <p style={{fontSize:13,color:"#64748b"}}>完成まで少しだけお待ちください</p>
+            <div>
+              <div className="flex justify-between items-end mb-2 ml-1">
+                <label className="block text-sm font-bold text-slate-500">
+                  なにを描きたい？ (画像の内容)
+                </label>
+              </div>
+              
+              <div 
+                className={`clay-input flex flex-col transition-all overflow-hidden ${isDragging ? 'border-violet-400 bg-violet-50/50 scale-[1.02]' : ''} ${isLimitReached ? 'opacity-50' : ''}`}
+                onDragOver={(e) => { e.preventDefault(); if(!isLimitReached) setIsDragging(true); }}
+                onDragLeave={() => setIsDragging(false)}
+                onDrop={handleDrop}
+              >
+                <textarea
+                  value={content}
+                  onChange={(e) => setContent(e.target.value)}
+                  disabled={isLimitReached}
+                  className="w-full bg-transparent text-slate-700 py-3 px-4 text-sm resize-none h-24 outline-none placeholder:text-slate-400 disabled:cursor-not-allowed"
+                  placeholder="生成したい画像の説明を入力..."
+                />
+                
+                {/* ★スマホ向けにアップロードエリアのレイアウトを微調整 */}
+                <div className="flex flex-wrap justify-between items-center px-3 pb-3 pt-1 gap-2">
+                  {isFileProcessing ? (
+                    <span className="text-[10px] sm:text-xs text-violet-500 font-bold flex items-center gap-1 animate-pulse">
+                      <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin shrink-0" />
+                      PDFを読み取り中...
+                    </span>
+                  ) : (
+                    <span className="text-[10px] sm:text-xs text-slate-400 font-bold flex items-center gap-1.5 pointer-events-none">
+                      <UploadCloud className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+                      <span className="truncate max-w-[120px] sm:max-w-none">JPG/PDFをドロップ</span>
+                    </span>
+                  )}
+                  
+                  <button 
+                    onClick={() => fileInputRef.current?.click()} 
+                    disabled={isLimitReached}
+                    className="text-xs bg-white/60 hover:bg-white text-slate-600 px-3 py-1.5 rounded-lg shadow-sm font-bold flex items-center gap-1 transition-all border border-slate-200 disabled:opacity-50 disabled:cursor-not-allowed shrink-0 ml-auto"
+                  >
+                    <FileText className="w-3.5 h-3.5" />
+                    選択
+                  </button>
+                  <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    onChange={handleFileSelect} 
+                    accept="image/jpeg, image/png, image/webp, application/pdf" 
+                    className="hidden" 
+                  />
                 </div>
-              ) : (
-                <div style={{opacity:.8,display:"flex",flexDirection:"column",alignItems:"center"}}>
-                  <div className="clay-panel" style={{width:96,height:96,display:"flex",alignItems:"center",justifyContent:"center",color:"#cbd5e1",marginBottom:24}}>
-                    <IconImage size={40} />
+              </div>
+
+              {referenceImage && !isLimitReached && (
+                <div className="mt-3 flex items-center gap-3 p-2 bg-white/60 rounded-xl border border-slate-200 shadow-sm animate-in fade-in max-w-full">
+                  <img src={referenceImage.dataUrl} alt="Reference" className="w-10 h-10 object-cover rounded-lg border border-slate-200 shrink-0" />
+                  <div className="flex flex-col overflow-hidden">
+                    <span className="text-xs font-bold text-violet-600 truncate">元画像セット完了！</span>
+                    <span className="text-[10px] text-slate-500 font-medium truncate">この画像を元に修正します</span>
                   </div>
-                  <h2 style={{fontSize:20,fontWeight:700,color:"#64748b",marginBottom:8}}>キャンバスは真っ白です</h2>
-                  <p style={{color:"#94a3b8",fontSize:13,fontWeight:700}}>画像やPDFをドロップしてプロンプトを作ってみよう！</p>
+                  <button 
+                    onClick={() => setReferenceImage(null)} 
+                    className="ml-auto p-1 bg-slate-200 rounded-full hover:bg-slate-300 transition-colors shrink-0"
+                  >
+                    <X className="w-3.5 h-3.5 text-slate-600" />
+                  </button>
                 </div>
               )}
             </div>
-          )}
 
-          {/* エラー */}
-          {error && (
-            <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24,textAlign:"center",zIndex:10}}>
-              <div className="clay-image-box" style={{padding:28,display:"flex",flexDirection:"column",alignItems:"center",maxWidth:400}}>
-                <IconAlert />
-                <h2 style={{fontSize:18,fontWeight:700,color:"#f43f5e",margin:"16px 0 8px"}}>ちょっと問題がおきました</h2>
-                <p style={{fontSize:13,color:"#475569",marginBottom:20,whiteSpace:"pre-line"}}>{error}</p>
-                <button className="clay-btn-sm" style={{padding:"8px 24px",fontWeight:700,color:"#475569",fontSize:13}} onClick={()=>setError(null)}>やり直す</button>
-              </div>
+            <div>
+              <Label>アートスタイル</Label>
+              <Select value={style} onChange={(e) => setStyle(e.target.value)} options={Object.keys(PROMPT_MAPPINGS.style)} disabled={isLimitReached} />
             </div>
-          )}
 
-          {/* 成功 */}
-          {generatedImage && !isGenerating && (
-            <div className="scrollbar" style={{display:"flex",flexDirection:"column",height:"100%",overflowY:"auto",gap:20}}>
-              <div className="clay-image-box" style={{display:"flex",alignItems:"center",justifyContent:"center",padding:16,minHeight:300,position:"relative"}}>
-                <img src={generatedImage} alt="Generated" style={{maxWidth:"100%",maxHeight:"60vh",objectFit:"contain",borderRadius:12}} />
-                <button className="clay-btn" onClick={handleDownload}
-                  style={{position:"absolute",bottom:16,right:16,padding:"10px 16px",fontSize:13,fontWeight:700,display:"flex",alignItems:"center",gap:6}}>
-                  <IconDownload /> 保存する
-                </button>
+            <div>
+              <Label>画質レベル</Label>
+              <Select value={quality} onChange={(e) => setQuality(e.target.value)} options={Object.keys(PROMPT_MAPPINGS.quality)} disabled={isLimitReached} />
+            </div>
+
+            <div>
+              <Label>ライティング</Label>
+              <Select value={lighting} onChange={(e) => setLighting(e.target.value)} options={Object.keys(PROMPT_MAPPINGS.lighting)} disabled={isLimitReached} />
+            </div>
+
+            <div>
+              <Label>構図</Label>
+              <Select value={composition} onChange={(e) => setComposition(e.target.value)} options={Object.keys(PROMPT_MAPPINGS.composition)} disabled={isLimitReached} />
+            </div>
+
+            <div>
+              <Label>画像サイズ</Label>
+              <Select value={size} onChange={(e) => setSize(e.target.value)} options={Object.keys(ASPECT_RATIO_MAPPINGS)} disabled={isLimitReached} />
+            </div>
+
+            <div className="mt-2 md:mt-4">
+              <button
+                onClick={handleGenerate}
+                disabled={isGenerating || isFileProcessing || isLimitReached}
+                className="clay-btn w-full py-3.5 sm:py-4 font-bold text-white flex items-center justify-center gap-2 text-base sm:text-lg disabled:opacity-70 disabled:cursor-not-allowed"
+              >
+                {isGenerating ? (
+                  <>
+                    <Loader2 className="w-5 h-5 sm:w-6 sm:h-6 animate-spin" />
+                    生成しています...
+                  </>
+                ) : (
+                  <>
+                    {isUnlocked ? <Sparkles className="w-5 h-5 text-yellow-300" /> : <Sparkles className="w-5 h-5" />}
+                    {referenceImage ? '元画像から修正する' : '画像をみつける'}
+                  </>
+                )}
+              </button>
+            </div>
+          </aside>
+
+          {/* ★変更点: スマホ向けに min-h-[300px]、PCは min-h-[500px] にして高さを可変に設定 */}
+          <section className="clay-panel flex-1 overflow-hidden flex flex-col relative min-h-[300px] lg:min-h-[500px] p-4 md:p-8">
+            
+            {!generatedImage && !error && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 p-6 text-center">
+                {isGenerating ? (
+                  <div className="flex flex-col items-center gap-4 sm:gap-5">
+                    <div className="clay-btn p-3 sm:p-4 rounded-full bg-violet-100 flex items-center justify-center">
+                      <Loader2 className="w-8 h-8 sm:w-10 sm:h-10 text-white animate-spin" />
+                    </div>
+                    <p className="text-lg sm:text-xl font-bold text-slate-600">AIが絵の具を混ぜています...</p>
+                    <p className="text-xs sm:text-sm text-slate-500">完成まで少しだけお待ちください</p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center opacity-60">
+                    <div className="w-20 h-20 sm:w-24 sm:h-24 mb-4 sm:mb-6 clay-image-box flex items-center justify-center text-slate-300 shrink-0">
+                      <ImageIcon className="w-8 h-8 sm:w-10 sm:h-10" />
+                    </div>
+                    <h2 className="text-lg sm:text-2xl font-bold text-slate-600 mb-2">キャンバスは真っ白です</h2>
+                    <p className="text-xs sm:text-sm text-slate-500 font-medium max-w-[250px] sm:max-w-none mx-auto">画像やPDFをドロップしてプロンプトを作ってみよう！</p>
+                  </div>
+                )}
               </div>
-              <div className="clay-image-box" style={{padding:20}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-                  <span style={{fontSize:13,fontWeight:700,color:"#64748b",display:"flex",alignItems:"center",gap:6}}>
-                    <span style={{color:"#8b5cf6"}}><IconSparkles /></span> 使用したプロンプト
-                  </span>
-                  <button className="clay-btn-sm" onClick={handleCopy}
-                    style={{padding:"6px 12px",fontSize:12,fontWeight:700,color:"#475569",display:"flex",alignItems:"center",gap:4}}>
-                    {copied ? <><IconCheck /> コピー完了！</> : <><IconCopy /> コピーする</>}
+            )}
+
+            {error && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center p-4 sm:p-6 text-center z-10">
+                <div className="clay-image-box p-5 sm:p-6 flex flex-col items-center max-w-md bg-white w-full">
+                  <AlertCircle className="w-10 h-10 sm:w-12 sm:h-12 text-rose-400 mb-3 sm:mb-4" />
+                  <h2 className="text-lg sm:text-xl font-bold text-rose-500 mb-2">ちょっと問題がおきました</h2>
+                  <p className="text-xs sm:text-sm text-slate-600 mb-5 sm:mb-6 whitespace-pre-line">{error}</p>
+                  <button 
+                    onClick={() => setError(null)}
+                    className="clay-btn-secondary px-5 sm:px-6 py-2 text-slate-600 font-bold text-sm"
+                  >
+                    やり直す
                   </button>
                 </div>
-                <div style={{background:"rgba(255,255,255,0.5)",padding:16,borderRadius:16,fontSize:12,fontFamily:"monospace",lineHeight:1.8,wordBreak:"break-all",color:"#475569"}}>
-                  {finalPrompt}
+              </div>
+            )}
+
+            {generatedImage && !isGenerating && (
+              <div className="flex flex-col h-full overflow-y-auto custom-scrollbar">
+                <div className="relative flex-1 flex items-center justify-center clay-image-box mb-6 sm:mb-8 p-3 sm:p-4 min-h-[250px] sm:min-h-[300px]">
+                  <img 
+                    src={generatedImage} 
+                    alt="Generated AI Art" 
+                    className="max-w-full max-h-[50vh] sm:max-h-[60vh] object-contain rounded-xl"
+                  />
+                  <button
+                    onClick={handleDownload}
+                    className="absolute bottom-4 right-4 sm:bottom-6 sm:right-6 clay-btn px-3 sm:px-4 py-2.5 sm:py-3 flex items-center gap-1.5 sm:gap-2 shadow-md"
+                  >
+                    <Download className="w-4 h-4 sm:w-5 sm:h-5" />
+                    <span className="font-bold text-xs sm:text-sm">保存する</span>
+                  </button>
+                </div>
+
+                <div className="clay-image-box p-4 sm:p-5">
+                  <div className="flex flex-wrap justify-between items-center gap-3 mb-3 sm:mb-4">
+                    <h3 className="text-xs sm:text-sm font-bold text-slate-500 flex items-center gap-1.5 sm:gap-2">
+                      <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-violet-400" />
+                      AIにお願いした魔法の言葉 (プロンプト)
+                    </h3>
+                    <button
+                      onClick={handleCopyPrompt}
+                      className="clay-btn-secondary flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 text-[10px] sm:text-xs font-bold text-slate-600 transition-all ml-auto"
+                    >
+                      {copySuccess ? (
+                        <><Check className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-500" /> コピー完了！</>
+                      ) : (
+                        <><Copy className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> コピーする</>
+                      )}
+                    </button>
+                  </div>
+                  <div className="bg-white/50 p-3 sm:p-4 rounded-xl sm:rounded-2xl text-slate-600 text-xs sm:text-sm font-mono leading-relaxed break-all shadow-inner">
+                    {finalPrompt}
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
-        </div>
+            )}
+          </section>
+        </main>
       </div>
     </div>
   );
 }
-
-ReactDOM.createRoot(document.getElementById("root")).render(<App />);
-</script>
-</body>
-</html>
