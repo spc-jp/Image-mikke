@@ -2,6 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>イメージみっけ</title>
     
@@ -644,74 +645,3 @@
                             <p className="text-xs sm:text-sm text-slate-500 font-medium max-w-[250px] sm:max-w-none mx-auto">画像やPDFをドロップしてプロンプトを作ってみよう！</p>
                           </div>
                         )}
-                      </div>
-                    )}
-
-                    {error && (
-                      <div className="absolute inset-0 flex flex-col items-center justify-center p-4 sm:p-6 text-center z-10">
-                        <div className="clay-image-box p-5 sm:p-6 flex flex-col items-center max-w-md bg-white w-full">
-                          <AlertCircle className="w-10 h-10 sm:w-12 sm:h-12 text-rose-400 mb-3 sm:mb-4" />
-                          <h2 className="text-lg sm:text-xl font-bold text-rose-500 mb-2">ちょっと問題がおきました</h2>
-                          <p className="text-xs sm:text-sm text-slate-600 mb-5 sm:mb-6 whitespace-pre-line">{error}</p>
-                          <button 
-                            onClick={() => setError(null)}
-                            className="clay-btn-secondary px-5 sm:px-6 py-2 text-slate-600 font-bold text-sm"
-                          >
-                            やり直す
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    {generatedImage && !isGenerating && (
-                      <div className="flex flex-col h-full overflow-y-auto custom-scrollbar">
-                        <div className="relative flex-1 flex items-center justify-center clay-image-box mb-6 sm:mb-8 p-3 sm:p-4 min-h-[250px] sm:min-h-[300px]">
-                          <img 
-                            src={generatedImage} 
-                            alt="Generated AI Art" 
-                            className="max-w-full max-h-[50vh] sm:max-h-[60vh] object-contain rounded-xl"
-                          />
-                          <button
-                            onClick={handleDownload}
-                            className="absolute bottom-4 right-4 sm:bottom-6 sm:right-6 clay-btn px-3 sm:px-4 py-2.5 sm:py-3 flex items-center gap-1.5 sm:gap-2 shadow-md"
-                          >
-                            <Download className="w-4 h-4 sm:w-5 sm:h-5" />
-                            <span className="font-bold text-xs sm:text-sm">保存する</span>
-                          </button>
-                        </div>
-
-                        <div className="clay-image-box p-4 sm:p-5">
-                          <div className="flex flex-wrap justify-between items-center gap-3 mb-3 sm:mb-4">
-                            <h3 className="text-xs sm:text-sm font-bold text-slate-500 flex items-center gap-1.5 sm:gap-2">
-                              <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-violet-400" />
-                              AIにお願いした魔法の言葉 (プロンプト)
-                            </h3>
-                            <button
-                              onClick={handleCopyPrompt}
-                              className="clay-btn-secondary flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 text-[10px] sm:text-xs font-bold text-slate-600 transition-all ml-auto"
-                            >
-                              {copySuccess ? (
-                                <><Check className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-500" /> コピー完了！</>
-                              ) : (
-                                <><Copy className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> コピーする</>
-                              )}
-                            </button>
-                          </div>
-                          <div className="bg-white/50 p-3 sm:p-4 rounded-xl sm:rounded-2xl text-slate-600 text-xs sm:text-sm font-mono leading-relaxed break-all shadow-inner">
-                            {finalPrompt}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </section>
-                </main>
-              </div>
-            </div>
-          );
-        }
-
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
-    </script>
-</body>
-</html>
